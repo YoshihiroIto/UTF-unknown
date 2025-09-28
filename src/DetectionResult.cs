@@ -18,7 +18,7 @@ public class DetectionResult
     /// <summary>
     /// Multiple results
     /// </summary>
-    public DetectionResult(IList<DetectionDetail> details)
+    public DetectionResult(DetectionDetail[] details)
     {
         Details = details;
     }
@@ -29,7 +29,7 @@ public class DetectionResult
     /// <param name="detectionDetail"></param>
     public DetectionResult(DetectionDetail detectionDetail)
     {
-        Details = new List<DetectionDetail> { detectionDetail };
+        Details = [detectionDetail];
     }
 
     /// <summary>
@@ -40,7 +40,7 @@ public class DetectionResult
     /// <summary>
     /// All results
     /// </summary>
-    public IList<DetectionDetail> Details { get; set; }
+    public DetectionDetail[] Details { get; set; }
 
     public override string ToString()
     {

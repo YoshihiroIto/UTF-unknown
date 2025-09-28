@@ -79,14 +79,14 @@ public class CharsetDetector
     /// <summary>
     /// "list" of probers
     /// </summary>
-    private IList<CharsetProber> _charsetProbers;
+    private CharsetProber[] _charsetProbers;
 
     /// <summary>
     /// TODO unknown
     /// </summary>
-    private IList<CharsetProber> _escCharsetProber;
+    private CharsetProber[] _escCharsetProber;
 
-    private IList<CharsetProber> CharsetProbers
+    private CharsetProber[] CharsetProbers
     {
         get
         {
@@ -98,7 +98,7 @@ public class CharsetDetector
                     return _charsetProbers;
                 default:
                     // pure ascii
-                    return new List<CharsetProber>();
+                    return [];
             }
         }
     }
@@ -585,7 +585,7 @@ public class CharsetDetector
                 .Select(prober => new DetectionDetail(prober))
                 .Where(result => result.Confidence > MinimumThreshold)
                 .OrderByDescending(result => result.Confidence)
-                .ToList();
+                .ToArray();
 
             return new DetectionResult(detectionResults);
 
@@ -604,24 +604,24 @@ public class CharsetDetector
         return new DetectionResult();
     }
 
-    private IList<CharsetProber> GetNewProbers()
+    private CharsetProber[] GetNewProbers()
     {
         switch (InputState)
         {
             case InputState.EscASCII:
-                return new List<CharsetProber>() { new EscCharsetProber() };
+                return [new EscCharsetProber()];
 
             case InputState.Highbyte:
-                return new List<CharsetProber>()
-                {
+                return
+                [
                     new MBCSGroupProber(),
                     new SBCSGroupProber(),
                     new Latin1Prober(),
-                };
+                ];
 
             default:
                 // pure ascii
-                return new List<CharsetProber>();
+                return [];
         }
     }
 }
