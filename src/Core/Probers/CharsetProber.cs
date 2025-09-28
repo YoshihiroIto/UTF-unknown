@@ -36,6 +36,7 @@
  *
  * ***** END LICENSE BLOCK ***** */
 
+using System;
 using System.IO;
 using System.Text;
 
@@ -65,7 +66,11 @@ public abstract class CharsetProber
     /// <returns>
     /// A <see cref="ProbingState"/>
     /// </returns>
-    public abstract ProbingState HandleData(byte[] buf, int offset, int len);
+    public virtual ProbingState HandleData(byte[] buf, int offset, int len)
+    {
+        return HandleData(new ReadOnlySpan<byte>(buf, offset, len));
+    }
+    public abstract ProbingState HandleData(ReadOnlySpan<byte> buf);
 
     /// <summary>
     /// Reset prober state
@@ -98,18 +103,17 @@ public abstract class CharsetProber
     ///
     /// </summary>
     /// <returns>filtered buffer</returns>
-    protected static byte[] FilterWithoutEnglishLetters(byte[] buf, int offset, int len)
+    protected static byte[] FilterWithoutEnglishLetters(ReadOnlySpan<byte> buf)
     {
         byte[] result;
 
         using (MemoryStream ms = new MemoryStream(buf.Length))
         {
             bool meetMSB = false;
-            int max = offset + len;
-            int prev = offset;
-            int cur = offset;
+            int prev = 0;
+            int cur = 0;
 
-            while (cur < max)
+            while (cur < buf.Length)
             {
                 byte b = buf[cur];
 
@@ -121,7 +125,11 @@ public abstract class CharsetProber
                 {
                     if (meetMSB && cur > prev)
                     {
-                        ms.Write(buf, prev, cur - prev);
+                        #if NETSTANDARD2_0
+                            ms.Write(buf.Slice(prev, cur - prev).ToArray(), 0, cur - prev);
+                        #else
+                            ms.Write(buf.Slice(prev, cur - prev));
+                        #endif
                         ms.WriteByte(SPACE);
                         meetMSB = false;
                     }
@@ -131,7 +139,11 @@ public abstract class CharsetProber
             }
 
             if (meetMSB && cur > prev)
-                ms.Write(buf, prev, cur - prev);
+                #if NETSTANDARD2_0
+                    ms.Write(buf.Slice(prev, cur - prev).ToArray(), 0, cur - prev);
+                #else
+                    ms.Write(buf.Slice(prev, cur - prev));
+                #endif
             ms.SetLength(ms.Position);
             result = ms.ToArray();
         }
@@ -144,7 +156,7 @@ public abstract class CharsetProber
     /// both English characters and upper ASCII characters.
     /// </summary>
     /// <returns>a filtered copy of the input buffer</returns>
-    protected static byte[] FilterWithEnglishLetters(byte[] buf, int offset, int len)
+    protected static byte[] FilterWithEnglishLetters(ReadOnlySpan<byte> buf)
     {
         byte[] result;
 
@@ -152,11 +164,10 @@ public abstract class CharsetProber
         {
 
             bool inTag = false;
-            int max = offset + len;
-            int prev = offset;
-            int cur = offset;
+            int prev = 0;
+            int cur = 0;
 
-            while (cur < max)
+            while (cur < buf.Length)
             {
 
                 byte b = buf[cur];
@@ -172,7 +183,11 @@ public abstract class CharsetProber
                 {
                     if (cur > prev && !inTag)
                     {
-                        ms.Write(buf, prev, cur - prev);
+                        #if NETSTANDARD2_0
+                            ms.Write(buf.Slice(prev, cur - prev).ToArray(), 0, cur - prev);
+                        #else
+                            ms.Write(buf.Slice(prev, cur - prev));
+                        #endif
                         ms.WriteByte(SPACE);
                     }
                     prev = cur + 1;
@@ -183,7 +198,11 @@ public abstract class CharsetProber
             // If the current segment contains more than just a symbol
             // and it is not inside a tag then keep it.
             if (!inTag && cur > prev)
-                ms.Write(buf, prev, cur - prev);
+                #if NETSTANDARD2_0
+                    ms.Write(buf.Slice(prev, cur - prev).ToArray(), 0, cur - prev);
+                #else
+                    ms.Write(buf.Slice(prev, cur - prev));
+                #endif
             ms.SetLength(ms.Position);
             result = ms.ToArray();
         }

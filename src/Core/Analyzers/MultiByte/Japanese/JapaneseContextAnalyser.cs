@@ -36,6 +36,8 @@
  *
  * ***** END LICENSE BLOCK ***** */
 
+using System;
+
 namespace UtfUnknown.Core.Analyzers.Japanese;
 
 public abstract class JapaneseContextAnalyser
@@ -165,10 +167,8 @@ public abstract class JapaneseContextAnalyser
             return DONT_KNOW;
     }
 
-    public void HandleData(byte[] buf, int offset, int len)
+    public void HandleData(ReadOnlySpan<byte> buf)
     {
-        int max = offset + len;
-
         if (done)
             return;
 
@@ -179,11 +179,11 @@ public abstract class JapaneseContextAnalyser
         // to record those bytes as well and analyse the character once it
         // is complete, but since a character will not make much difference,
         // skipping it will simplify our logic and improve performance.
-        for (int i = needToSkipCharNum+offset; i < max; ) {
-            int order = GetOrder(buf, i, out var charLen);
+        for (int i = needToSkipCharNum; i < buf.Length; ) {
+            int order = GetOrder(buf.Slice(i), out var charLen);
             i += charLen;
-            if (i > max) {
-                needToSkipCharNum = i - max;
+            if (i > buf.Length) {
+                needToSkipCharNum = i - buf.Length;
                 lastCharOrder = -1;
             } else {
                 if (order != -1 && lastCharOrder != -1) {
@@ -199,7 +199,17 @@ public abstract class JapaneseContextAnalyser
         }
     }
 
+    public void HandleData(byte[] buf, int offset, int len)
+    {
+        HandleData(new ReadOnlySpan<byte>(buf, offset, len));
+    }
+
     public void HandleOneChar(byte[] buf, int offset, int charLen)
+    {
+        HandleOneChar(new ReadOnlySpan<byte>(buf, offset, charLen), charLen);
+    }
+
+    public void HandleOneChar(ReadOnlySpan<byte> buf, int charLen)
     {
         if (totalRel > MAX_REL_THRESHOLD)
             done = true;
@@ -207,7 +217,7 @@ public abstract class JapaneseContextAnalyser
             return;
 
         // Only 2-bytes characters are of our interest
-        int order = (charLen == 2) ? GetOrder(buf, offset) : -1;
+        int order = (charLen == 2) ? GetOrder(buf) : -1;
         if (order != -1 && lastCharOrder != -1) {
             totalRel++;
             // count this sequence to its category counter
@@ -227,9 +237,19 @@ public abstract class JapaneseContextAnalyser
         }
     }
 
-    protected abstract int GetOrder(byte[] buf, int offset, out int charLen);
+    protected virtual int GetOrder(byte[] buf, int offset, out int charLen)
+    {
+        return GetOrder(new ReadOnlySpan<byte>(buf, offset, buf.Length - offset), out charLen);
+    }
 
-    protected abstract int GetOrder(byte[] buf, int offset);
+    protected abstract int GetOrder(ReadOnlySpan<byte> buf, out int charLen);
+
+    protected virtual int GetOrder(byte[] buf, int offset)
+    {
+        return GetOrder(new ReadOnlySpan<byte>(buf, offset, buf.Length - offset));
+    }
+
+    protected abstract int GetOrder(ReadOnlySpan<byte> buf);
 
     public bool GotEnoughData()
     {

@@ -36,6 +36,7 @@
  *
  * ***** END LICENSE BLOCK ***** */
 
+using System;
 using System.Text;
 
 using UtfUnknown.Core.Analyzers.Japanese;
@@ -70,12 +71,14 @@ public class SJISProber : CharsetProber
         return CodepageName.SHIFT_JIS;
     }
 
-    public override ProbingState HandleData(byte[] buf, int offset, int len)
+    public override ProbingState HandleData(ReadOnlySpan<byte> buf)
     {
-        int codingState;
-        int max = offset + len;
+        if (buf.Length == 0)
+            return state;
 
-        for (int i = offset; i < max; i++)
+        int codingState;
+
+        for (int i = 0; i < buf.Length; i++)
         {
             codingState = codingSM.NextState(buf[i]);
             if (codingState == StateMachineModel.ERROR)
@@ -91,21 +94,25 @@ public class SJISProber : CharsetProber
             if (codingState == StateMachineModel.START)
             {
                 int charLen = codingSM.CurrentCharLen;
-                if (i == offset)
+                if (i == 0)
                 {
-                    lastChar[1] = buf[offset];
-                    contextAnalyser.HandleOneChar(lastChar, 2 - charLen, charLen);
-                    distributionAnalyser.HandleOneChar(lastChar, 0, charLen);
+                    lastChar[1] = buf[0];
+                    Span<byte> crossBufferChar = stackalloc byte[2];
+                    crossBufferChar[0] = lastChar[0];
+                    crossBufferChar[1] = lastChar[1];
+
+                    contextAnalyser.HandleOneChar(crossBufferChar.Slice(2 - charLen, charLen), charLen);
+                    distributionAnalyser.HandleOneChar(crossBufferChar.Slice(0, charLen), charLen);
                 }
                 else
                 {
-                    contextAnalyser.HandleOneChar(buf, i + 1 - charLen, charLen);
-                    distributionAnalyser.HandleOneChar(buf, i - 1, charLen);
+                    contextAnalyser.HandleOneChar(buf.Slice(i + 1 - charLen, charLen), charLen);
+                    distributionAnalyser.HandleOneChar(buf.Slice(i - 1, charLen), charLen);
                 }
             }
         }
 
-        lastChar[0] = buf[max - 1];
+        lastChar[0] = buf[buf.Length - 1];
 
         if (state == ProbingState.Detecting)
             if (contextAnalyser.GotEnoughData() && GetConfidence() > SHORTCUT_THRESHOLD)

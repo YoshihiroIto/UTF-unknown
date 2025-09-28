@@ -35,6 +35,8 @@
  *
  * ***** END LICENSE BLOCK ***** */
 
+using System;
+
 namespace UtfUnknown.Core.Analyzers;
 
 /// <summary>
@@ -79,7 +81,12 @@ public abstract class CharDistributionAnalyser
     /// <param name="buf">A <see cref="System.Byte"/></param>
     /// <param name="offset"></param>
     /// <returns></returns>
-    public abstract int GetOrder(byte[] buf, int offset);
+    public virtual int GetOrder(byte[] buf, int offset)
+    {
+        return GetOrder(new ReadOnlySpan<byte>(buf, offset, 2));
+    }
+
+    public abstract int GetOrder(ReadOnlySpan<byte> buf);
 
     /// <summary>
     /// Feed a character with known length
@@ -89,8 +96,13 @@ public abstract class CharDistributionAnalyser
     /// <param name="charLen">1 of 2 char length?</param>
     public void HandleOneChar(byte[] buf, int offset, int charLen)
     {
+        HandleOneChar(new ReadOnlySpan<byte>(buf, offset, charLen), charLen);
+    }
+
+    public virtual void HandleOneChar(ReadOnlySpan<byte> buf, int charLen)
+    {
         //we only care about 2-bytes character in our distribution analysis
-        int order = (charLen == 2) ? GetOrder(buf, offset) : -1;
+        int order = (charLen == 2) ? GetOrder(buf) : -1;
         if (order >= 0)
         {
             totalChars++;

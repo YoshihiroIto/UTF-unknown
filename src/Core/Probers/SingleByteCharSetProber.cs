@@ -90,11 +90,9 @@ public class SingleByteCharSetProber : CharsetProber
         Reset();
     }
 
-    public override ProbingState HandleData(byte[] buf, int offset, int len)
+    public override ProbingState HandleData(ReadOnlySpan<byte> buf)
     {
-        int max = offset + len;
-
-        for (int i = offset; i < max; i++)
+        for (int i = 0; i < buf.Length; i++)
         {
             byte order = model.GetOrder(buf[i]);
 

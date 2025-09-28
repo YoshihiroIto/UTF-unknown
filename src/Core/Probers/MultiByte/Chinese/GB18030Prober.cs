@@ -36,6 +36,7 @@
  *
  * ***** END LICENSE BLOCK ***** */
 
+using System;
 using System.Text;
 
 using UtfUnknown.Core.Analyzers.Chinese;
@@ -64,42 +65,45 @@ public class GB18030Prober : CharsetProber
         return CodepageName.GB18030;
     }
 
-    public override ProbingState HandleData(byte[] buf, int offset, int len)
+    public override ProbingState HandleData(ReadOnlySpan<byte> buf)
     {
-        int max = offset + len;
+        if (buf.Length == 0)
+            return state;
 
-        for (int i = offset; i < max; i++)
+        int codingState;
+
+        for (int i = 0; i < buf.Length; i++)
         {
-            var codingState = codingSM.NextState(buf[i]);
-
+            codingState = codingSM.NextState(buf[i]);
             if (codingState == StateMachineModel.ERROR)
             {
                 state = ProbingState.NotMe;
                 break;
             }
-
             if (codingState == StateMachineModel.ITSME)
             {
                 state = ProbingState.FoundIt;
                 break;
             }
-
             if (codingState == StateMachineModel.START)
             {
                 int charLen = codingSM.CurrentCharLen;
-                if (i == offset)
+                if (i == 0)
                 {
-                    lastChar[1] = buf[offset];
-                    analyser.HandleOneChar(lastChar, 0, charLen);
+                    lastChar[1] = buf[0];
+                    Span<byte> crossBufferChar = stackalloc byte[2];
+                    crossBufferChar[0] = lastChar[0];
+                    crossBufferChar[1] = lastChar[1];
+                    analyser.HandleOneChar(crossBufferChar.Slice(0, charLen), charLen);
                 }
                 else
                 {
-                    analyser.HandleOneChar(buf, i - 1, charLen);
+                    analyser.HandleOneChar(buf.Slice(i - 1, charLen), charLen);
                 }
             }
         }
 
-        lastChar[0] = buf[max - 1];
+        lastChar[0] = buf[buf.Length - 1];
 
         if (state == ProbingState.Detecting)
         {

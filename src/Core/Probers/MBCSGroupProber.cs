@@ -36,6 +36,7 @@
  *
  * ***** END LICENSE BLOCK ***** */
 
+using System;
 using System.Text;
 
 using UtfUnknown.Core.Probers.MultiByte;
@@ -106,16 +107,15 @@ public class MBCSGroupProber : CharsetProber
         state = ProbingState.Detecting;
     }
 
-    public override ProbingState HandleData(byte[] buf, int offset, int len)
+    public override ProbingState HandleData(ReadOnlySpan<byte> buf)
     {
         // do filtering to reduce load to probers
-        byte[] highbyteBuf = new byte[len];
+        Span<byte> highbyteBuf = buf.Length <= 1024 ? stackalloc byte[buf.Length] : new byte[buf.Length];
         int hptr = 0;
         //assume previous is not ascii, it will do no harm except add some noise
         bool keepNext = true;
-        int max = offset + len;
 
-        for (int i = offset; i < max; i++)
+        for (int i = 0; i < buf.Length; i++)
         {
             if ((buf[i] & 0x80) != 0)
             {
@@ -133,11 +133,13 @@ public class MBCSGroupProber : CharsetProber
             }
         }
 
+        var highbyteSpan = highbyteBuf.Slice(0, hptr);
+
         for (int i = 0; i < probers.Length; i++)
         {
             if (isActive[i])
             {
-                var st = probers[i].HandleData(highbyteBuf, 0, hptr);
+                var st = probers[i].HandleData(highbyteSpan);
                 if (st == ProbingState.FoundIt)
                 {
                     bestGuess = i;

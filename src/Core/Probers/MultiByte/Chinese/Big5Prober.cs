@@ -36,6 +36,7 @@
  *
  * ***** END LICENSE BLOCK ***** */
 
+using System;
 using System.Text;
 
 using UtfUnknown.Core.Analyzers.Chinese;
@@ -58,13 +59,16 @@ public class Big5Prober : CharsetProber
         Reset();
     }
 
-    public override ProbingState HandleData(byte[] buf, int offset, int len)
+    public override ProbingState HandleData(ReadOnlySpan<byte> buf)
     {
-        int max = offset + len;
+        if (buf.Length == 0)
+            return state;
 
-        for (int i = offset; i < max; i++)
+        int codingState;
+
+        for (int i = 0; i < buf.Length; i++)
         {
-            var codingState = codingSM.NextState(buf[i]);
+            codingState = codingSM.NextState(buf[i]);
             if (codingState == StateMachineModel.ERROR)
             {
                 state = ProbingState.NotMe;
@@ -78,19 +82,22 @@ public class Big5Prober : CharsetProber
             if (codingState == StateMachineModel.START)
             {
                 int charLen = codingSM.CurrentCharLen;
-                if (i == offset)
+                if (i == 0)
                 {
-                    lastChar[1] = buf[offset];
-                    distributionAnalyser.HandleOneChar(lastChar, 0, charLen);
+                    lastChar[1] = buf[0];
+                    Span<byte> crossBufferChar = stackalloc byte[2];
+                    crossBufferChar[0] = lastChar[0];
+                    crossBufferChar[1] = lastChar[1];
+                    distributionAnalyser.HandleOneChar(crossBufferChar.Slice(0, charLen), charLen);
                 }
                 else
                 {
-                    distributionAnalyser.HandleOneChar(buf, i - 1, charLen);
+                    distributionAnalyser.HandleOneChar(buf.Slice(i - 1, charLen), charLen);
                 }
             }
         }
 
-        lastChar[0] = buf[max - 1];
+        lastChar[0] = buf[buf.Length - 1];
 
         if (state == ProbingState.Detecting)
             if (distributionAnalyser.GotEnoughData() && GetConfidence() > SHORTCUT_THRESHOLD)
