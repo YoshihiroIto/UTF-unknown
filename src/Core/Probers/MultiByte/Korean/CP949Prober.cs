@@ -71,6 +71,7 @@ public class CP949Prober : CharsetProber
             return state;
 
         int codingState;
+        Span<byte> crossBufferChar = stackalloc byte[2];
 
         for (int i = 0; i < buf.Length; i++)
         {
@@ -93,7 +94,6 @@ public class CP949Prober : CharsetProber
                 if (i == 0)
                 {
                     lastByte1 = buf[0];
-                    Span<byte> crossBufferChar = stackalloc byte[2];
                     crossBufferChar[0] = lastByte0;
                     crossBufferChar[1] = lastByte1;
                     distributionAnalyser.HandleOneChar(crossBufferChar.Slice(0, charLen), charLen);
