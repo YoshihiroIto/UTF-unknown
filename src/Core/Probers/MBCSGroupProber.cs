@@ -37,6 +37,7 @@
  * ***** END LICENSE BLOCK ***** */
 
 using System;
+using System.Buffers;
 using System.Text;
 
 using UtfUnknown.Core.Probers.MultiByte;
@@ -110,56 +111,67 @@ public class MBCSGroupProber : CharsetProber
     public override ProbingState HandleData(ReadOnlySpan<byte> buf)
     {
         // do filtering to reduce load to probers
-        Span<byte> highbyteBuf = buf.Length <= 1024 ? stackalloc byte[buf.Length] : new byte[buf.Length];
-        int hptr = 0;
-        //assume previous is not ascii, it will do no harm except add some noise
-        bool keepNext = true;
-
-        for (int i = 0; i < buf.Length; i++)
+        var highbyteBufPool = buf.Length >= 1024 ? ArrayPool<byte>.Shared.Rent(buf.Length) : null;
+        Span<byte> highbyteBuf = highbyteBufPool is null
+            ? stackalloc byte[buf.Length]
+            : highbyteBufPool.AsSpan(0, buf.Length);
+        try
         {
-            if ((buf[i] & 0x80) != 0)
+            int hptr = 0;
+            //assume previous is not ascii, it will do no harm except add some noise
+            bool keepNext = true;
+
+            for (int i = 0; i < buf.Length; i++)
             {
-                highbyteBuf[hptr++] = buf[i];
-                keepNext = true;
-            }
-            else
-            {
-                //if previous is highbyte, keep this even it is a ASCII
-                if (keepNext)
+                if ((buf[i] & 0x80) != 0)
                 {
                     highbyteBuf[hptr++] = buf[i];
-                    keepNext = false;
+                    keepNext = true;
                 }
-            }
-        }
-
-        var highbyteSpan = highbyteBuf.Slice(0, hptr);
-
-        for (int i = 0; i < probers.Length; i++)
-        {
-            if (isActive[i])
-            {
-                var st = probers[i].HandleData(highbyteSpan);
-                if (st == ProbingState.FoundIt)
+                else
                 {
-                    bestGuess = i;
-                    state = ProbingState.FoundIt;
-                    break;
-                }
-                else if (st == ProbingState.NotMe)
-                {
-                    isActive[i] = false;
-                    activeNum--;
-                    if (activeNum <= 0)
+                    //if previous is highbyte, keep this even it is a ASCII
+                    if (keepNext)
                     {
-                        state = ProbingState.NotMe;
-                        break;
+                        highbyteBuf[hptr++] = buf[i];
+                        keepNext = false;
                     }
                 }
             }
-        }
 
-        return state;
+            var highbyteSpan = highbyteBuf.Slice(0, hptr);
+
+            for (int i = 0; i < probers.Length; i++)
+            {
+                if (isActive[i])
+                {
+                    var st = probers[i].HandleData(highbyteSpan);
+                    if (st == ProbingState.FoundIt)
+                    {
+                        bestGuess = i;
+                        state = ProbingState.FoundIt;
+                        break;
+                    }
+                    else if (st == ProbingState.NotMe)
+                    {
+                        isActive[i] = false;
+                        activeNum--;
+                        if (activeNum <= 0)
+                        {
+                            state = ProbingState.NotMe;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            return state;
+        }
+        finally
+        {
+            if (highbyteBufPool is not null)
+                ArrayPool<byte>.Shared.Return(highbyteBufPool);
+        }
     }
 
     public override float GetConfidence(StringBuilder status = null)
