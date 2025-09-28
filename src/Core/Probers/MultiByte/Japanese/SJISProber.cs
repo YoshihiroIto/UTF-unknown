@@ -56,7 +56,8 @@ public class SJISProber : CharsetProber
     private CodingStateMachine codingSM;
     private SJISContextAnalyser contextAnalyser;
     private SJISDistributionAnalyser distributionAnalyser;
-    private byte[] lastChar = new byte[2];
+    private byte lastByte0;
+    private byte lastByte1;
 
     public SJISProber()
     {
@@ -96,10 +97,10 @@ public class SJISProber : CharsetProber
                 int charLen = codingSM.CurrentCharLen;
                 if (i == 0)
                 {
-                    lastChar[1] = buf[0];
+                    lastByte1 = buf[0];
                     Span<byte> crossBufferChar = stackalloc byte[2];
-                    crossBufferChar[0] = lastChar[0];
-                    crossBufferChar[1] = lastChar[1];
+                    crossBufferChar[0] = lastByte0;
+                    crossBufferChar[1] = lastByte1;
 
                     contextAnalyser.HandleOneChar(crossBufferChar.Slice(2 - charLen, charLen), charLen);
                     distributionAnalyser.HandleOneChar(crossBufferChar.Slice(0, charLen), charLen);
@@ -112,7 +113,7 @@ public class SJISProber : CharsetProber
             }
         }
 
-        lastChar[0] = buf[buf.Length - 1];
+        lastByte0 = buf[buf.Length - 1];
 
         if (state == ProbingState.Detecting)
             if (contextAnalyser.GotEnoughData() && GetConfidence() > SHORTCUT_THRESHOLD)
@@ -127,6 +128,8 @@ public class SJISProber : CharsetProber
         state = ProbingState.Detecting;
         contextAnalyser.Reset();
         distributionAnalyser.Reset();
+        lastByte0 = 0;
+        lastByte1 = 0;
     }
 
     public override float GetConfidence(StringBuilder status = null)

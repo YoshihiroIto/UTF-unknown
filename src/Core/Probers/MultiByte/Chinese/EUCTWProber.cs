@@ -49,7 +49,8 @@ public class EUCTWProber : CharsetProber
 {
     private CodingStateMachine codingSM;
     private EUCTWDistributionAnalyser distributionAnalyser;
-    private byte[] lastChar = new byte[2];
+    private byte lastByte0;
+    private byte lastByte1;
 
     public EUCTWProber()
     {
@@ -85,10 +86,10 @@ public class EUCTWProber : CharsetProber
                 int charLen = codingSM.CurrentCharLen;
                 if (i == 0)
                 {
-                    lastChar[1] = buf[0];
+                    lastByte1 = buf[0];
                     Span<byte> crossBufferChar = stackalloc byte[2];
-                    crossBufferChar[0] = lastChar[0];
-                    crossBufferChar[1] = lastChar[1];
+                    crossBufferChar[0] = lastByte0;
+                    crossBufferChar[1] = lastByte1;
                     distributionAnalyser.HandleOneChar(crossBufferChar.Slice(0, charLen), charLen);
                 }
                 else
@@ -98,7 +99,7 @@ public class EUCTWProber : CharsetProber
             }
         }
 
-        lastChar[0] = buf[buf.Length - 1];
+        lastByte0 = buf[buf.Length - 1];
 
         if (state == ProbingState.Detecting)
             if (distributionAnalyser.GotEnoughData() && GetConfidence() > SHORTCUT_THRESHOLD)
@@ -117,6 +118,8 @@ public class EUCTWProber : CharsetProber
         codingSM.Reset();
         state = ProbingState.Detecting;
         distributionAnalyser.Reset();
+        lastByte0 = 0;
+        lastByte1 = 0;
     }
 
     public override float GetConfidence(StringBuilder status = null)
