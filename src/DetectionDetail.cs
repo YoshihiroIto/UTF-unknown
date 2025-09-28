@@ -1,4 +1,7 @@
-﻿using System;
+﻿#if NET8_0_OR_GREATER
+using System.Collections.Frozen;
+#endif
+using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System.Text;
@@ -21,6 +24,15 @@ public class DetectionDetail
     /// <summary>
     /// A dictionary for replace unsupported codepage name in .NET to the nearly identical version.
     /// </summary>
+#if NET8_0_OR_GREATER
+    private static readonly FrozenDictionary<string, string> FixedToSupportCodepageName =
+        new Dictionary<string, string>
+        {
+            // CP949 is superset of ks_c_5601-1987 (see https://github.com/CharsetDetector/UTF-unknown/pull/74#issuecomment-550362133)
+            {CodepageName.CP949, CodepageName.KS_C_5601_1987},
+            {CodepageName.ISO_2022_CN, CodepageName.X_CP50227},
+        }.ToFrozenDictionary();
+#else
     private static readonly Dictionary<string, string> FixedToSupportCodepageName =
         new Dictionary<string, string>
         {
@@ -28,6 +40,7 @@ public class DetectionDetail
             {CodepageName.CP949, CodepageName.KS_C_5601_1987},
             {CodepageName.ISO_2022_CN, CodepageName.X_CP50227},
         };
+#endif
 
     /// <summary>
     /// New result
